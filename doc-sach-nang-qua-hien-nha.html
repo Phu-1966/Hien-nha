@@ -14,9 +14,77 @@ header a{color:#f7dca9;text-decoration:none;font-size:13px;white-space:nowrap}he
 button{border:1px solid #b7a27f;background:#fffaf0;color:#29443a;padding:8px 13px;border-radius:4px;font-size:16px;min-width:42px}button:disabled{opacity:.4}
 #page{font-weight:600;text-align:center;max-width:60%;overflow-wrap:anywhere}
 #status{font:13px/1.5 system-ui,sans-serif;text-align:center;padding:8px 12px;color:#655944;min-height:38px}
-#viewer{height:calc(100dvh - 150px);min-height:420px;width:100%;overflow:hidden;background:var(--paper)}
-#viewer iframe{border:0!important}
-@media(min-width:800px){#viewer{max-width:900px;margin:0 auto;height:calc(100dvh - 150px);box-shadow:0 0 24px #c7b99d}}
+body{
+
+  height:100vh;
+
+  height:100dvh;
+
+  min-height:0;
+
+  display:flex;
+
+  flex-direction:column;
+
+  overflow:hidden;
+
+}
+
+header{
+
+  position:relative;
+
+  flex-shrink:0;
+
+}
+
+.controls{
+
+  flex-shrink:0;
+
+}
+
+#status{
+
+  flex-shrink:0;
+
+}
+
+#viewer{
+
+  flex:1 1 0;
+
+  min-height:0;
+
+  width:100%;
+
+  overflow:hidden;
+
+  background:var(--paper);
+
+}
+
+#viewer iframe{
+
+  border:0!important;
+
+}
+
+@media(min-width:800px){
+
+  #viewer{
+
+    max-width:900px;
+
+    width:100%;
+
+    margin:0 auto;
+
+    box-shadow:0 0 24px #c7b99d;
+
+  }
+
+}
 </style>
 </head>
 <body>
