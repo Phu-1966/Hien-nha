@@ -20,7 +20,7 @@ button{border:1px solid #b7a27f;background:#fffaf0;color:#29443a;padding:8px 13p
 </style>
 </head>
 <body>
-<header><a href="index.html">← Về Hiên nhà</a><div class="bookname">  NHÌN GIÓ CUỐN ĐI . HẢO PHẠM</div><span style="width:54px"></span></header>
+<header><a href="index.html">← Về Hiên nhà</a><div class="bookname"> NHÌN GIÓ CUỐN ĐI.HẢO PHẠM</div><span style="width:54px"></span></header>
 <div class="controls"><button id="prev" aria-label="Trang trước" disabled>‹</button><button id="jumpBack" aria-label="Lùi 10 trang">−10</button><span id="page">Đang chuẩn bị…</span><button id="jumpForward" aria-label="Tiến 10 trang">+10</button><button id="next" aria-label="Trang sau" disabled>›</button></div>
 <div id="status" role="status" aria-live="polite">Đang kết nối để mở sách…</div>
 <div id="viewer" aria-label="Trang đọc sách"></div>
@@ -34,6 +34,24 @@ button{border:1px solid #b7a27f;background:#fffaf0;color:#29443a;padding:8px 13p
  const prev=document.getElementById('prev'), next=document.getElementById('next');
  const jumpBack=document.getElementById('jumpBack'), jumpForward=document.getElementById('jumpForward');
  const bookUrl=new URL('./book/NHIN_GIO_CUON_DI_HAO_PHAM_WORD_V3.epub',window.location.href).href;
+
+// Bộ nhớ vị trí đọc riêng cho từng cuốn sách
+
+const storageKey='hien-nha-reading:'+bookUrl;
+
+let savedCFI=null;
+
+let resumeReading=false;
+
+try {
+
+  savedCFI=localStorage.getItem(storageKey);
+
+} catch(e) {
+
+  console.warn('Không truy cập được bộ nhớ đọc sách:',e);
+
+}
  const timeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
  try{
   status.textContent='Đang kiểm tra bộ đọc sách…';
@@ -69,15 +87,66 @@ button{border:1px solid #b7a27f;background:#fffaf0;color:#29443a;padding:8px 13p
   let totalBookPages=0;
   let currentSpineIndex=0;
   function updateCounter(loc){
-   if(!loc || !loc.start || !loc.start.displayed){page.textContent='Đang đọc';return;}
-   const idx=Number.isInteger(loc.start.index)?loc.start.index:0;
-   currentSpineIndex=idx;
-   const localPage=loc.start.displayed.page||1;
-   const offset=sectionPages.slice(0,idx).reduce((sum,n)=>sum+(n||0),0);
-   if(totalBookPages>0 && sectionPages[idx]) page.textContent='Trang '+(offset+localPage)+' / '+totalBookPages;
-   else page.textContent='Trang '+localPage+' · chương '+(idx+1);
-   prev.disabled=!!loc.atStart; next.disabled=!!loc.atEnd;
+
+  if(!loc || !loc.start) return;
+
+  const idx=Number.isInteger(loc.start.index)
+
+    ? loc.start.index : 0;
+
+  currentSpineIndex=idx;
+
+  // Lưu vị trí đọc chính xác bằng EPUB CFI
+
+  if(loc.start.cfi){
+
+    try {
+
+      localStorage.setItem(storageKey,loc.start.cfi);
+
+    } catch(e) {
+
+      console.warn('Không lưu được vị trí đọc:',e);
+
+    }
+
   }
+
+  if(!loc.start.displayed){
+
+    page.textContent='Đang đọc';
+
+    return;
+
+  }
+
+  const localPage=loc.start.displayed.page||1;
+
+  const offset=sectionPages
+
+    .slice(0,idx)
+
+    .reduce((sum,n)=>sum+(n||0),0);
+
+  if(totalBookPages>0 && sectionPages[idx]){
+
+    page.textContent=
+
+      'Trang '+(offset+localPage)+' / '+totalBookPages;
+
+  } else {
+
+    page.textContent=
+
+      'Trang '+localPage+' · chương '+(idx+1);
+
+  }
+
+  prev.disabled=!!loc.atStart;
+
+  next.disabled=!!loc.atEnd;
+
+}
   rendition.on('relocated',updateCounter);
   prev.addEventListener('click',()=>rendition.prev());
   next.addEventListener('click',()=>rendition.next());
@@ -89,8 +158,71 @@ button{border:1px solid #b7a27f;background:#fffaf0;color:#29443a;padding:8px 13p
   }
   jumpBack.addEventListener('click',()=>jumpPages(-10));
   jumpForward.addEventListener('click',()=>jumpPages(10));
-  await timeout(book.ready,15000,'Đã tải tệp nhưng EPUB không hoàn tất khởi tạo.');
-  await timeout(rendition.display(),15000,'Đã nạp sách nhưng trang đầu không hiển thị kịp.');
+  await timeout(
+
+  book.ready,
+
+  15000,
+
+  'Đã tải tệp nhưng EPUB không hoàn tất khởi tạo.'
+
+);
+
+// Kiểm tra vị trí đọc lần trước
+
+if(savedCFI){
+
+  resumeReading=window.confirm(
+
+    'Bạn đã đọc cuốn sách này trước đó.\n\n' +
+
+    'Bạn có muốn tiếp tục từ trang đã đọc dở không?'
+
+  );
+
+}
+
+// Mở đúng vị trí đã lưu
+
+let resumeCFI=resumeReading ? savedCFI : null;
+
+try {
+
+  await timeout(
+
+    rendition.display(resumeCFI || undefined),
+
+    15000,
+
+    'Đã nạp sách nhưng trang không hiển thị kịp.'
+
+  );
+
+} catch(error) {
+
+  // Nếu vị trí cũ không còn hợp lệ, trở về trang đầu
+
+  console.warn('Không khôi phục được vị trí cũ:',error);
+
+  resumeCFI=null;
+
+  try {
+
+    localStorage.removeItem(storageKey);
+
+  } catch(e) {}
+
+  await timeout(
+
+    rendition.display(),
+
+    15000,
+
+    'Không thể mở trang đầu sách.'
+
+  );
+
+}
   status.textContent='Đang tính số trang toàn sách…';
   // Measure every spine section in a separate off-screen rendition so the visible reader does not jump.
   try {
@@ -111,8 +243,9 @@ button{border:1px solid #b7a27f;background:#fffaf0;color:#29443a;padding:8px 13p
    }
    totalBookPages=sectionPages.reduce((sum,n)=>sum+(n||0),0);
    meter.destroy(); measure.remove();
-   // Restore the reader to the beginning after background pagination measurement.
-   await rendition.display();
+   // Khôi phục đúng vị trí người đọc đang đọc
+
+await rendition.display(resumeCFI || undefined);
    status.textContent='Sách đã mở. Dùng mũi tên hoặc nút ±10 để lật trang.';
   } catch(measureError){
    console.warn('Không tính được tổng trang:',measureError);
